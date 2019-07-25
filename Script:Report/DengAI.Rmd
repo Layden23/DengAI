@@ -1,0 +1,252 @@
+---
+title: "Predicting cases of dengue"
+author: "Joël Ribera Zaragoza"
+date: "`r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+    toc_depth: 5
+    toc_float: true
+    collapsed: true
+    smooth_scroll: false
+    thumbnails: true
+    lightbox: true
+---
+
+
+```{r knitr_init, echo=FALSE, cache=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="150")
+opts_chunk$set(echo=T,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+path <- getwd()
+
+knitr::opts_knit$set(root.dir = normalizePath(path.expand(path),
+                                             winslash = ("/"),
+                                             mustWork = TRUE))
+opts_knit$set(width=75)
+```
+
+###Import and preprocessing
+
+```{r, warning=FALSE,message=FALSE}
+#We first import the packages that we need to do the task:
+library(readr)
+library(Metrics)
+library(ggplot2)
+library(markdown)
+library(corrplot)
+library(dplyr)
+library(caret)
+#We import our data and rename the columns:
+set.seed(203)
+setwd("..")
+dengue <- read_csv("./Datasets/dengue_features_train.csv")
+dengue_label <- read_csv("./Datasets/dengue_labels_train.csv")
+total_dengue <- merge(dengue, dengue_label)
+any(is.na(total_dengue))
+#Dengue with missing values erased
+dengue2 <- total_dengue
+str(dengue2)
+dengue_iq <- filter(dengue2, city == "iq")
+dengue_sj <- filter(dengue2, city == "sj")
+dengue_iq <- dengue_iq[-1]
+#dengue_iq <- dengue_iq[-3]
+dengue_sj <- dengue_sj[-1]
+
+#cor_iq <- round(digits = 2 , cor(dengue_iq, method = c("pearson", "kendall", "spearman")))
+#No correlations found
+
+```
+
+
+
+
+
+
+
+### Model SJ
+
+
+```{r model}
+ndengue_sj <- as.data.frame(dengue_sj$total_cases)
+ndengue_sj$year <- dengue_sj$year
+ndengue_sj$weekofyear <- dengue_sj$weekofyear
+ndengue_sj$week_start_date <- dengue_sj$week_start_date
+ndengue_sj$total_cases <- dengue_sj$total_cases
+ndengue_sj <- ndengue_sj[-1]
+sj_training_index <- createDataPartition(y = ndengue_sj$total_cases, p = 0.75, 
+                                      list= FALSE)
+sj_trainSet <- ndengue_sj[sj_training_index, ]
+sj_testSet <- ndengue_sj[-sj_training_index, ]
+```
+
+
+
+
+```{r}
+#We'll try a tree model
+fitControl <- trainControl(## 10-fold CV
+                           method = "repeatedcv",
+                           number = 10,
+                           ## repeated ten times
+                           repeats = 10)
+sj_gbm_model <- train(total_cases ~., data = sj_trainSet, method = "gbm", 
+                    trControl = fitControl,
+                 ## This last option is actually one
+                 ## for gbm() that passes through
+                 verbose = FALSE, metric = "MAE")
+```
+
+```{r}
+sj_rf_model <- train(total_cases ~., data = sj_trainSet, method = "rf", 
+                    trControl = fitControl,
+                 ## This last option is actually one
+                 ## for gbm() that passes through
+                 verbose = FALSE, metric = "MAE")
+```
+
+```{r}
+#Models
+
+sj_rf_model
+sj_gbm_model$bestTune
+
+#rf_model gives better results
+```
+```{r}
+sj_predictions <- predict(sj_rf_model, sj_testSet)
+abs_error <- abs(sj_predictions - sj_testSet$total_cases)
+abs_error
+mean(abs_error)
+mae(sj_predictions,sj_testSet$total_cases)
+```
+
+
+### Model IQ
+
+```{r model}
+ndengue_iq <- as.data.frame(dengue_iq$total_cases)
+ndengue_iq$year <- dengue_iq$year
+ndengue_iq$weekofyear <- dengue_iq$weekofyear
+ndengue_iq$week_start_date <- dengue_iq$week_start_date
+ndengue_iq$total_cases <- dengue_iq$total_cases
+ndengue_iq <- ndengue_iq[-1]
+iq_training_index <- createDataPartition(y = ndengue_iq$total_cases, p = 0.75, 
+                                      list= FALSE)
+
+iq_trainSet <- ndengue_iq[iq_training_index,]
+iq_testSet <- ndengue_iq[-iq_training_index,]
+```
+
+
+
+
+```{r}
+#We'll try a tree model
+fitControl <- trainControl(## 10-fold CV
+                           method = "repeatedcv",
+                           number = 10,
+                           ## repeated ten times
+                           repeats = 10)
+iq_gbm_model <- train(total_cases ~., data = iq_trainSet, method = "gbm", 
+                    trControl = fitControl,
+                 ## This last option is actually one
+                 ## for gbm() that passes through
+                 verbose = FALSE, metric = "MAE")
+```
+
+```{r}
+
+iq_rf_model <- train(total_cases ~., data = iq_trainSet, method = "rf", 
+                    trControl = fitControl,
+                 ## This last option is actually one
+                 ## for gbm() that passes through
+                 verbose = FALSE, metric = "MAE")
+```
+
+
+```{r}
+#Models
+iq_rf_model
+iq_gbm_model 
+
+#rf_model gives better results
+```
+```{r}
+iq_predictions <- predict(iq_rf_model, iq_testSet)
+iq_abs_error <- abs(iq_predictions - iq_testSet$total_cases)
+iq_abs_error
+mean(iq_abs_error)
+mae(iq_predictions,iq_testSet$total_cases)
+
+```
+### Submission
+```{r, warning = FALSE, message=FALSE}
+setwd("..")
+
+dengue_test <- read_csv("./Datasets/dengue_features_test.csv")
+dengue_test_iq <- filter(dengue_test, city == "iq")
+dengue_test_sj <- filter(dengue_test, city == "sj")
+final_iq_predictions <- predict(iq_rf_model, dengue_test_iq)
+final_sj_predictions <- predict(sj_rf_model, dengue_test_sj)
+dengue_test_iq$prediction <- final_iq_predictions
+dengue_test_sj$prediction <- final_sj_predictions
+result_dengue_test <- rbind(dengue_test_sj,dengue_test_iq)
+result_dengue_test$prediction <- round(result_dengue_test$prediction)
+
+submission_format <- read_csv("./Datasets/submission_format.csv")
+submission_format$total_cases <- result_dengue_test$prediction
+results_dengue_test <- as.data.frame(result_dengue_test$prediction)
+write.csv(submission_format, file = "./Results/first_try.csv")
+```
+
+### Prophet try
+
+```{r}
+library(prophet)
+prophet_iq <- as_data_frame(ndengue_iq$week_start_date)
+prophet_iq$ds <- ndengue_iq$week_start_date
+prophet_iq$y <- ndengue_iq$total_cases
+iq_prophet_model <- prophet(prophet_iq, weekly.seasonality = F,
+                         daily.seasonality = F)
+
+iq_future <- as.data.frame(dengue_test_iq$week_start_date)
+iq_future$ds <- dengue_test_iq$week_start_date
+iq_future <- iq_future[-1]
+iq_prophet_predictions <- predict(prophet_model, future)
+
+prophet_sj <- as_data_frame(ndengue_sj$week_start_date)
+prophet_sj$ds <- ndengue_sj$week_start_date
+prophet_sj$y <- ndengue_sj$total_cases
+sj_prophet_model <- prophet(prophet_sj, weekly.seasonality = F,
+                         daily.seasonality = F)
+
+sj_future <- as.data.frame(dengue_test_sj$week_start_date)
+sj_future$ds <- dengue_test_sj$week_start_date
+sj_future <- sj_future[-1]
+sj_prophet_predictions <- predict(prophet_model, sj_future)
+sj_pro_preds <- sj_prophet_predictions$yhat
+dengue_test_iq$prediction <- iq_prophet_predictions$yhat
+dengue_test_sj$prediction <- sj_prophet_predictions$yhat
+result_dengue_test <- rbind(dengue_test_sj,dengue_test_iq)
+result_dengue_test$prediction <- round(result_dengue_test$prediction)
+
+
+setwd("..")
+
+submission_format <- read_csv("./Datasets/submission_format.csv")
+submission_format$total_cases <- result_dengue_test$prediction
+results_dengue_test <- as.data.frame(result_dengue_test$prediction)
+
+write.csv(submission_format, file = "./Results/prophet_try.csv", quote = F, row.names = F)
+```
+
