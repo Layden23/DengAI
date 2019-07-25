@@ -76,7 +76,7 @@ dengue_sj <- dengue_sj[-1]
 ### Model SJ
 
 
-```{r model}
+```{r }
 ndengue_sj <- as.data.frame(dengue_sj$total_cases)
 ndengue_sj$year <- dengue_sj$year
 ndengue_sj$weekofyear <- dengue_sj$weekofyear
@@ -222,7 +222,7 @@ iq_prophet_model <- prophet(prophet_iq, weekly.seasonality = F,
 iq_future <- as.data.frame(dengue_test_iq$week_start_date)
 iq_future$ds <- dengue_test_iq$week_start_date
 iq_future <- iq_future[-1]
-iq_prophet_predictions <- predict(prophet_model, future)
+iq_prophet_predictions <- predict(iq_prophet_model, iq_future)
 
 prophet_sj <- as_data_frame(ndengue_sj$week_start_date)
 prophet_sj$ds <- ndengue_sj$week_start_date
@@ -233,7 +233,7 @@ sj_prophet_model <- prophet(prophet_sj, weekly.seasonality = F,
 sj_future <- as.data.frame(dengue_test_sj$week_start_date)
 sj_future$ds <- dengue_test_sj$week_start_date
 sj_future <- sj_future[-1]
-sj_prophet_predictions <- predict(prophet_model, sj_future)
+sj_prophet_predictions <- predict(sj_prophet_model, sj_future)
 sj_pro_preds <- sj_prophet_predictions$yhat
 dengue_test_iq$prediction <- iq_prophet_predictions$yhat
 dengue_test_sj$prediction <- sj_prophet_predictions$yhat

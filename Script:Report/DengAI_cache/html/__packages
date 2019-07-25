@@ -1,0 +1,14 @@
+base
+knitr
+rmdformats
+readr
+Metrics
+ggplot2
+markdown
+corrplot
+dplyr
+lattice
+caret
+Rcpp
+rlang
+prophet
